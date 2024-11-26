@@ -8,11 +8,12 @@ namespace exl::hook::nx64 {
     };
 
     union GpRegisters {
-        GpRegister m_Gp[31];
+        GpRegister m_Gp[32];
         struct {
             GpRegister _Gp[29];
-            GpRegister m_Fp;
-            GpRegister m_Lr;
+            u64 m_Fp;
+            u64 m_Lr;
+            u64 m_Sp;
         };
     };
 
@@ -50,6 +51,9 @@ namespace exl::hook::nx64 {
         struct GpRegisterAccessor64 : public GpRegisterAccessorImpl {
             u64& operator[](int index)
             {
+                EXL_ASSERT(index >= 0 && index < 32, "Register index must not be out of bounds!");
+                EXL_ASSERT(index != 17, "Access to r17 is not supported!");
+
                 return Get().m_Gp[index].X;
             }
         };
@@ -57,7 +61,20 @@ namespace exl::hook::nx64 {
         struct GpRegisterAccessor32 : public GpRegisterAccessorImpl {
             u32& operator[](int index)
             {
+                EXL_ASSERT(index >= 0 && index < 29, "Register index must not be out of bounds and fit the width!");
+                EXL_ASSERT(index != 17, "Access to r17 is not supported!");
+
                 return Get().m_Gp[index].W;
+            }
+        };
+
+        struct SpRegisterAccessor {
+            u64 Get() {
+                return *reinterpret_cast<u64*>(this);
+            }
+
+            u64& operator[](int offset) {
+                return *reinterpret_cast<u64*>(Get() + offset);
             }
         };
 
@@ -94,6 +111,10 @@ namespace exl::hook::nx64 {
             /* Accessors are union'd with the gprs so that they can be accessed directly. */
             impl::GpRegisterAccessor64 X;
             impl::GpRegisterAccessor32 W;
+            struct {
+                GpRegister _Gp[31];
+                impl::SpRegisterAccessor SP;
+            };
             GpRegisters m_Gpr;
         };
     };
